@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0b1220" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="road1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#sky1)"/>
+  <path d="M0 420 L1200 300 L1200 675 L0 675 Z" fill="rgba(255,255,255,0.04)"/>
+  <path d="M0 520 L1200 390 L1200 675 L0 675 Z" fill="url(#road1)"/>
+  <g stroke="rgba(255,255,255,0.22)" stroke-width="6" stroke-linecap="round">
+    <path d="M600 520 C620 500, 640 470, 660 440"/>
+    <path d="M580 560 C600 540, 620 510, 640 480"/>
+    <path d="M560 610 C580 590, 600 560, 620 530"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="70" y="230" width="170" height="260" rx="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)"/>
+    <rect x="255" y="200" width="170" height="290" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)"/>
+    <rect x="895" y="205" width="170" height="285" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)"/>
+    <rect x="710" y="190" width="170" height="300" rx="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)"/>
+  </g>
+  <text x="60" y="80" fill="rgba(255,255,255,0.72)" font-family="ui-sans-serif, system-ui" font-size="34" font-weight="700">Street View</text>
+</svg>
+

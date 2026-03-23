@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Premium baseline */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-hero-gradient text-slate-100 antialiased;
+}
+
+/* Glassmorphism helpers */
+.glass {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 0 0 1px rgba(2, 132, 199, 0.08), 0 10px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+}
+
+/* Remove default focus outline for mouse, keep for keyboard users */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  @apply ring-2 ring-sky-400 ring-offset-0;
+}
+
