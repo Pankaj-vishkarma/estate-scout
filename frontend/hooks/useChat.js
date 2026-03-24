@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { sendMessage } from "../lib/api";
+import { useCallback, useMemo, useState } from "react";
+import { sendMessage, getHistory } from "../lib/api";
 
 function safeId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -10,62 +10,11 @@ function safeId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-const STORAGE_KEY = "estate_scout_chat_messages_v1";
-
 export function useChat() {
   const [messages, setMessages] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // ✅ FIX: Load messages ONLY on client (no SSR mismatch)
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-
-      if (!raw) {
-        setMessages([
-          {
-            id: safeId(),
-            role: "assistant",
-            content: "Hi! Tell me what kind of property you're looking for 🏠",
-            createdAt: Date.now(),
-          },
-        ]);
-        return;
-      }
-
-      const parsed = JSON.parse(raw);
-
-      if (!Array.isArray(parsed)) {
-        setMessages([]);
-        return;
-      }
-
-      const validMessages = parsed
-        .filter(
-          (m) =>
-            m &&
-            typeof m.content === "string" &&
-            (m.role === "user" || m.role === "assistant")
-        )
-        .slice(-50);
-
-      setMessages(validMessages);
-    } catch {
-      setMessages([]);
-    }
-  }, []);
-
-  // ✅ Persist chat in localStorage
-  useEffect(() => {
-    if (!messages.length) return;
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-    } catch {
-      // ignore storage errors
-    }
-  }, [messages]);
 
   const api = useMemo(
     () => ({
@@ -86,19 +35,28 @@ export function useChat() {
         setIsLoading(true);
 
         try {
-          // 🔥 FIX: sendMessage returns STRING (reply)
-          const reply = await sendMessage(trimmed);
+          const res = await sendMessage(trimmed);
 
-          console.log("🔥 Reply from backend:", reply);
+          // 🔥 handle reply properly
+          const reply =
+            typeof res === "string" ? res : res?.reply || "No response from server";
 
           const assistantMsg = {
             id: safeId(),
             role: "assistant",
-            content: typeof reply === "string" ? reply : "No response from server",
+            content: reply,
             createdAt: Date.now(),
           };
 
           setMessages((prev) => [...prev, assistantMsg]);
+
+          // 🔥 SET ONLY CURRENT SEARCH PROPERTIES
+          if (res?.properties) {
+            setProperties(res.properties);
+          } else {
+            setProperties([]);
+          }
+
         } catch (e) {
           console.error("Chat Hook Error:", e);
           setError("Server not responding. Please try again.");
@@ -112,11 +70,49 @@ export function useChat() {
 
   const clearError = useCallback(() => setError(null), []);
 
+  // 🔥 HISTORY FROM BACKEND
+  const loadHistory = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      const data = await getHistory();
+
+      if (data?.messages) {
+        setMessages(data.messages);
+      }
+
+      if (data?.properties) {
+        setProperties(data.properties);
+      }
+    } catch (err) {
+      console.error("History Load Error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 🔥 NEW SEARCH
+  const newSearch = useCallback(() => {
+    setMessages([
+      {
+        id: safeId(),
+        role: "assistant",
+        content: "Hi! Tell me what kind of property you're looking for 🏠",
+        createdAt: Date.now(),
+      },
+    ]);
+
+    setProperties([]);
+  }, []);
+
   return {
     messages,
+    properties,
     isLoading,
     error,
     clearError,
     sendUserMessage: api.sendUserMessage,
+    loadHistory,
+    newSearch,
   };
 }

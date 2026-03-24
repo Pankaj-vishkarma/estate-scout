@@ -5,19 +5,16 @@ import { motion } from "framer-motion";
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-function getPropImage(p) {
-  const img =
-    p?.imageUrl ||
-    p?.image_url ||
-    p?.image ||
-    p?.photo ||
-    p?.thumbnail ||
-    null;
-
+function resolveImage(img) {
   if (!img || typeof img !== "string") return null;
 
-  // 🔥 Handle relative path from backend
-  if (img.startsWith("/")) {
+  // 🔥 FIX: local frontend images
+  if (img.startsWith("/images")) {
+    return img; // ✅ frontend serve karega
+  }
+
+  // 🔥 backend files (screenshots)
+  if (img.startsWith("/data")) {
     return `${BASE_URL}${img}`;
   }
 
@@ -35,9 +32,9 @@ function formatPrice(price) {
   const n = Number(cleaned);
 
   if (Number.isFinite(n)) {
-    return n.toLocaleString(undefined, {
+    return n.toLocaleString("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       maximumFractionDigits: 0,
     });
   }
@@ -56,13 +53,18 @@ export default function PropertyCard({ property }) {
   const price = formatPrice(property?.price);
   const address = getPropAddress(property);
 
-  const rawImage = getPropImage(property);
+  // 🔥 IMAGE RESOLVE
+  const primaryImage = resolveImage(property?.image); // local image
+  const streetImage = resolveImage(property?.street_view); // screenshot
 
-  // 🔥 FINAL fallback logic (important)
-  const finalImage =
-    rawImage && rawImage.startsWith("http")
-      ? rawImage
-      : rawImage || "/images/street-1.svg";
+  // 🔥 FINAL STRICT PRIORITY FIX
+  let finalImage = "/images/street-1.svg";
+
+  if (primaryImage && primaryImage.includes("/images")) {
+    finalImage = primaryImage; // ✅ ALWAYS local image first
+  } else if (streetImage) {
+    finalImage = streetImage; // fallback
+  }
 
   return (
     <motion.div

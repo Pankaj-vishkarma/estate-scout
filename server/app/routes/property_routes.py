@@ -8,11 +8,18 @@ router = APIRouter()
 @router.get("/properties")
 def get_properties():
     try:
-        # 🔥 FIX 1: Latest properties only (sorted by newest)
-        properties = list(properties_collection.find().sort("_id", -1).limit(2))
+        # 🔥 FIX 1: REMOVE LIMIT (IMPORTANT)
+        properties = list(properties_collection.find().sort("_id", -1))
+
+        # 🔥 DEBUG (CHECK IMAGE FIELD)
+        print("[API] Raw Properties:", properties)
 
         # 🔥 FIX 2: Serialize properly
-        return [property_serializer(p) for p in properties]
+        result = [property_serializer(p) for p in properties]
+
+        print("[API] Serialized Properties:", result)
+
+        return result
 
     except Exception as e:
         print(f"[Property Route ERROR]: {e}")

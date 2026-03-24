@@ -9,10 +9,10 @@ import time
 import os
 
 
-def take_screenshot(address: str, filename: str):
+def run_browser_action(action: str, value: str = "", filename: str = "output.png"):
     options = webdriver.ChromeOptions()
 
-    # 🔥 Headless (faster + no UI)
+    # 🔥 Headless mode
     options.add_argument("--headless=new")
     options.add_argument("--start-maximized")
     options.add_argument("--disable-gpu")
@@ -25,40 +25,44 @@ def take_screenshot(address: str, filename: str):
     wait = WebDriverWait(driver, 10)
 
     try:
-        print(f"[Browser] Opening map for: {address}")
+        print(f"[Browser] Action: {action} | Value: {value}")
 
         driver.get("http://localhost:3000/map-simulator")
 
-        # 🔥 Wait for input field
-        search_box = wait.until(EC.presence_of_element_located((By.ID, "search-box")))
+        # 🔥 TYPE action
+        if action in ["type", "search_and_capture"]:
+            search_box = wait.until(
+                EC.presence_of_element_located((By.ID, "search-box"))
+            )
+            search_box.clear()
+            search_box.send_keys(value)
 
-        search_box.clear()
-        search_box.send_keys(address)
+        # 🔥 CLICK action
+        if action in ["click", "search_and_capture"]:
+            search_btn = wait.until(EC.element_to_be_clickable((By.ID, "search-btn")))
+            search_btn.click()
 
-        # 🔥 Wait for button
-        search_btn = wait.until(EC.element_to_be_clickable((By.ID, "search-btn")))
+        # 🔥 SCREENSHOT action
+        if action in ["screenshot", "search_and_capture"]:
+            image = wait.until(
+                EC.presence_of_element_located((By.ID, "street-view-image"))
+            )
 
-        search_btn.click()
+            time.sleep(1)
 
-        # 🔥 Wait for image update
-        image = wait.until(EC.presence_of_element_located((By.ID, "street-view-image")))
+            os.makedirs("data/screenshots", exist_ok=True)
+            path = f"data/screenshots/{filename}"
 
-        time.sleep(1)  # small delay for render
+            image.screenshot(path)
 
-        # 🔥 Create folder
-        os.makedirs("data/screenshots", exist_ok=True)
-        path = f"data/screenshots/{filename}"
+            print(f"[Browser] Screenshot saved: {path}")
 
-        # 🔥 Take screenshot of ONLY image (important)
-        image.screenshot(path)
+            return path
 
-        print(f"[Browser] Screenshot saved: {path}")
-
-        return path
+        return None
 
     except Exception as e:
         print(f"[Browser ERROR]: {e}")
-
         return "data/screenshots/fallback.png"
 
     finally:

@@ -1,59 +1,167 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState, useRef } from "react";
+
 import { useChat } from "../hooks/useChat";
+import { useAuth } from "../hooks/useAuth";
+import AuthModal from "../components/auth/AuthModal";
+
 import ChatWindow from "../components/chat/ChatWindow";
 import PropertyGrid from "../components/property/PropertyGrid";
 import Button from "../components/ui/Button";
 
+import { FaUserCircle, FaSignOutAlt } from "react-icons/fa";
+
 export default function HomePage() {
-  const { messages, isLoading, error, clearError, sendUserMessage } = useChat();
+  const {
+    messages,
+    properties,
+    isLoading,
+    error,
+    clearError,
+    sendUserMessage,
+    loadHistory,
+    newSearch,
+  } = useChat();
+
+  const { user, logout } = useAuth();
+  const [showModal, setShowModal] = useState(false);
+
+  // 🔥 NEW: dropdown state
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setShowModal(true);
+    }
+  }, []);
+
+  // 🔥 NEW: close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleNewSearch = () => {
+    newSearch();
+  };
+
+  const handleLoadHistory = () => {
+    loadHistory();
+  };
+
+  // 🔥 LOGOUT HANDLER (unchanged logic)
+  const handleLogout = () => {
+    logout();
+    window.location.reload();
+  };
 
   return (
     <main className="min-h-screen">
       <div className="relative">
-        <div className="absolute inset-0 pointer-events-none bg-hero-gradient" />
-        <div className="relative mx-auto max-w-7xl px-4 py-6">
-          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-            <div>
-              <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-50">
-                Estate Scout
-              </div>
-              <div className="text-sm text-slate-300 mt-1">
-                AI Property Agent dashboard: chat + listings.
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Link href="/map-simulator">
-                <Button variant="ghost" size="md">
-                  Map Simulator
-                </Button>
-              </Link>
-            </div>
-          </header>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <section className="lg:col-span-5 xl:col-span-5">
-              <ChatWindow
-                messages={messages}
-                isLoading={isLoading}
-                error={error}
-                onSend={sendUserMessage}
-                onClearError={clearError}
-              />
-            </section>
+        {/* 🔥 BLUR WHEN NOT LOGGED IN */}
+        <div className={showModal ? "blur-sm" : ""}>
+          <div className="absolute inset-0 pointer-events-none bg-hero-gradient" />
 
-            <section className="lg:col-span-7 xl:col-span-7">
-              <PropertyGrid key={messages.length} />
-            </section>
+          <div className="relative mx-auto max-w-7xl px-4 py-6">
+
+            {/* 🔥 HEADER */}
+            <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+
+              {/* LEFT */}
+              <div>
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-50">
+                  Estate Scout
+                </div>
+                <div className="text-sm text-slate-300 mt-1">
+                  AI Property Agent dashboard: chat + listings.
+                </div>
+              </div>
+
+              {/* RIGHT */}
+              <div className="flex items-center gap-3 flex-wrap">
+
+                {/* MAP */}
+                <Link href="/map-simulator">
+                  <Button variant="ghost" size="md">
+                    Map Simulator
+                  </Button>
+                </Link>
+
+                {/* 🔥 PROFILE DROPDOWN */}
+                {user && (
+                  <div className="relative" ref={dropdownRef}>
+
+                    {/* PROFILE BUTTON (same UI style) */}
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      className="flex items-center gap-2"
+                    >
+                      <FaUserCircle className="text-blue-400" />
+                      {user?.name || "User"}
+                    </Button>
+
+                    {/* DROPDOWN */}
+                    {isProfileOpen && (
+                      <div className="absolute right-0 mt-2 w-40 bg-slate-900 border border-white/10 rounded-lg shadow-lg overflow-hidden z-50">
+
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-red-500/20 transition"
+                        >
+                          <FaSignOutAlt />
+                          Logout
+                        </button>
+
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
+            </header>
+
+            {/* MAIN GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <section className="lg:col-span-5 xl:col-span-5">
+                <ChatWindow
+                  messages={messages}
+                  isLoading={isLoading}
+                  error={error}
+                  onSend={sendUserMessage}
+                  onClearError={clearError}
+                  onNewSearch={handleNewSearch}
+                  onLoadHistory={handleLoadHistory}
+                />
+              </section>
+
+              <section className="lg:col-span-7 xl:col-span-7">
+                <PropertyGrid properties={properties} />
+              </section>
+            </div>
+
+            <footer className="mt-6 text-center text-xs text-slate-400">
+              Estate Scout UI demo. Connect your backend at `http://localhost:8000`.
+            </footer>
           </div>
-
-          <footer className="mt-6 text-center text-xs text-slate-400">
-            Estate Scout UI demo. Connect your backend at `http://localhost:8000`.
-          </footer>
         </div>
+
+        {/* 🔥 AUTH MODAL */}
+        <AuthModal isOpen={showModal} />
+
       </div>
     </main>
   );
 }
-

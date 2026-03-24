@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { getProperties } from "../../lib/api";
 import Loader from "../ui/Loader";
 import PropertyCard from "./PropertyCard";
 
@@ -16,39 +15,37 @@ function normalizeProperties(data) {
       price: p?.price || "N/A",
       address: p?.address || "Unknown location",
       image: p?.image || "/images/street-1.svg",
+      street_view: p?.street_view || null,
     }))
     .slice(0, 60);
 }
 
-export default function PropertyGrid() {
+export default function PropertyGrid({ properties: incomingProperties = [] }) {
   const [properties, setProperties] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 🔥 CORE LOAD FUNCTION (UPDATED - SINGLE SOURCE)
   async function loadProperties() {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await getProperties();
-      console.log("Fetched properties:", data);
-
-      const normalized = normalizeProperties(data);
+      const normalized = normalizeProperties(incomingProperties);
       setProperties(normalized);
     } catch (e) {
       console.error("PropertyGrid Error:", e);
-      setError("Failed to load properties. Check backend connection.");
+      setError("Failed to load properties.");
       setProperties([]);
     } finally {
       setIsLoading(false);
     }
   }
 
-  // 🔥 INITIAL LOAD
+  // 🔥 INITIAL LOAD + PROP CHANGE TRACK
   useEffect(() => {
     loadProperties();
-  }, []);
-
+  }, [incomingProperties]);
 
   const skeletons = useMemo(() => Array.from({ length: 6 }, (_, i) => i), []);
 
@@ -70,7 +67,6 @@ export default function PropertyGrid() {
               {isLoading ? "Loading..." : `${properties.length} results`}
             </div>
 
-            {/* Manual Refresh */}
             <button
               onClick={loadProperties}
               className="text-xs text-slate-300 hover:text-white"
@@ -133,7 +129,7 @@ export default function PropertyGrid() {
                 No properties found
               </div>
               <div className="mt-2 text-sm text-slate-300">
-                Try again later or check the backend `/properties` endpoint.
+                Try searching from chat or load history.
               </div>
             </motion.div>
           ) : (

@@ -12,17 +12,20 @@ export default function ChatWindow({
   error = null,
   onSend,
   onClearError,
+
+  // 🔥 NEW PROPS
+  onNewSearch,
+  onLoadHistory,
 }) {
   const endRef = useRef(null);
 
-  // 🔥 FIX: Prevent hydration mismatch (render after mount)
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // ✅ Smooth auto scroll (safe)
+  // ✅ Smooth auto scroll
   useEffect(() => {
     if (!mounted) return;
 
@@ -45,7 +48,6 @@ export default function ChatWindow({
     []
   );
 
-  // 🔥 FIX: Avoid SSR hydration mismatch
   if (!mounted) {
     return (
       <div className="glass rounded-2xl border border-white/10 overflow-hidden h-[560px]" />
@@ -63,10 +65,24 @@ export default function ChatWindow({
             Ask the AI about properties, pricing, or locations.
           </div>
         </div>
-        <div className="hidden sm:flex">
-          <div className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-slate-200">
-            Premium Agent UX
-          </div>
+
+        {/* 🔥 NEW: ACTION BUTTONS (NO UI BREAK) */}
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onNewSearch}
+          >
+            New Search
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLoadHistory}
+          >
+            History
+          </Button>
         </div>
       </div>
 
@@ -91,7 +107,7 @@ export default function ChatWindow({
             </div>
           )}
 
-          {/* ✅ Messages (safe render) */}
+          {/* ✅ Messages */}
           <AnimatePresence initial={false}>
             {messages.map((m, index) => {
               if (!m || typeof m.content !== "string") return null;
@@ -131,7 +147,6 @@ export default function ChatWindow({
                   variant="ghost"
                   size="sm"
                   onClick={onClearError}
-                  aria-label="Dismiss error"
                 >
                   Dismiss
                 </Button>
