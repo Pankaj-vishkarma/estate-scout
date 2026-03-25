@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Loader from "../ui/Loader";
 import PropertyCard from "./PropertyCard";
@@ -14,38 +14,21 @@ function normalizeProperties(data) {
       title: p?.title || "Untitled Property",
       price: p?.price || "N/A",
       address: p?.address || "Unknown location",
-      image: p?.image || "/images/street-1.svg",
-      street_view: p?.street_view || null,
+      image: p?.image || "/images/apartment1.jpg", // ✅ FIXED
+      street_view: p?.street_view || p?.image || "/images/apartment1.jpg",
     }))
     .slice(0, 60);
 }
 
 export default function PropertyGrid({ properties: incomingProperties = [] }) {
-  const [properties, setProperties] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // ✅ DIRECT DERIVED STATE (NO EXTRA RENDER)
+  const properties = useMemo(
+    () => normalizeProperties(incomingProperties),
+    [incomingProperties]
+  );
 
-  // 🔥 CORE LOAD FUNCTION (UPDATED - SINGLE SOURCE)
-  async function loadProperties() {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const normalized = normalizeProperties(incomingProperties);
-      setProperties(normalized);
-    } catch (e) {
-      console.error("PropertyGrid Error:", e);
-      setError("Failed to load properties.");
-      setProperties([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // 🔥 INITIAL LOAD + PROP CHANGE TRACK
-  useEffect(() => {
-    loadProperties();
-  }, [incomingProperties]);
+  const isLoading = incomingProperties === null;
+  const hasError = incomingProperties === undefined;
 
   const skeletons = useMemo(() => Array.from({ length: 6 }, (_, i) => i), []);
 
@@ -66,13 +49,6 @@ export default function PropertyGrid({ properties: incomingProperties = [] }) {
             <div className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs text-slate-200">
               {isLoading ? "Loading..." : `${properties.length} results`}
             </div>
-
-            <button
-              onClick={loadProperties}
-              className="text-xs text-slate-300 hover:text-white"
-            >
-              Refresh
-            </button>
           </div>
         </div>
       </div>
@@ -84,7 +60,6 @@ export default function PropertyGrid({ properties: incomingProperties = [] }) {
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="grid grid-cols-1 sm:grid-cols-2 gap-4"
             >
               {skeletons.map((i) => (
@@ -101,7 +76,7 @@ export default function PropertyGrid({ properties: incomingProperties = [] }) {
                 </div>
               ))}
             </motion.div>
-          ) : error ? (
+          ) : hasError ? (
             <motion.div
               key="error"
               initial={{ opacity: 0 }}
@@ -109,14 +84,9 @@ export default function PropertyGrid({ properties: incomingProperties = [] }) {
               className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4"
             >
               <div className="text-sm font-semibold text-red-100">Error</div>
-              <div className="mt-1 text-sm text-red-100/90">{error}</div>
-
-              <button
-                onClick={loadProperties}
-                className="mt-3 text-xs text-red-200 underline"
-              >
-                Retry
-              </button>
+              <div className="mt-1 text-sm text-red-100/90">
+                Failed to load properties.
+              </div>
             </motion.div>
           ) : properties.length === 0 ? (
             <motion.div
@@ -137,7 +107,6 @@ export default function PropertyGrid({ properties: incomingProperties = [] }) {
               key="grid"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="grid grid-cols-1 sm:grid-cols-2 gap-4"
             >
               {properties.map((p) => (

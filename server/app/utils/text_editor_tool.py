@@ -1,14 +1,24 @@
-import os  # 🔥 NEW
+import os
 
 
-def write_file(path: str, content: str):
+def write_file(path: str, content: str) -> bool:
     try:
-        # 🔥 Ensure directory exists (CRITICAL FIX)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        # ✅ Validate path
+        if not path or not isinstance(path, str):
+            raise ValueError("Invalid file path")
 
-        # 🔥 FIX: UTF-8 encoding added
+        directory = os.path.dirname(path)
+
+        # ✅ Ensure directory exists
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
+        # ✅ Write file safely
         with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write(content or "")
+
+        return True  # ✅ success
 
     except Exception as e:
         print(f"[TextEditor ERROR]: {e}")
+        return False  # ❌ failure

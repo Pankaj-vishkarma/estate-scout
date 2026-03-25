@@ -26,29 +26,40 @@ export default function HomePage() {
   } = useChat();
 
   const { user, logout } = useAuth();
+
   const [showModal, setShowModal] = useState(false);
-
-  // 🔥 NEW: dropdown state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const dropdownRef = useRef(null);
 
+  const dropdownRef = useRef(null);
+  const hasCheckedAuth = useRef(false); // ✅ prevent flicker
+
+  // ✅ SAFE AUTH CHECK (NO SSR CRASH)
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const token = localStorage.getItem("token");
+
     if (!token) {
       setShowModal(true);
     }
+
+    hasCheckedAuth.current = true;
   }, []);
 
-  // 🔥 NEW: close dropdown on outside click
+  // ✅ CLOSE DROPDOWN OUTSIDE CLICK
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target)
+      ) {
         setIsProfileOpen(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleNewSearch = () => {
@@ -59,7 +70,6 @@ export default function HomePage() {
     loadHistory();
   };
 
-  // 🔥 LOGOUT HANDLER (unchanged logic)
   const handleLogout = () => {
     logout();
     window.location.reload();
@@ -98,25 +108,21 @@ export default function HomePage() {
                   </Button>
                 </Link>
 
-                {/* 🔥 PROFILE DROPDOWN */}
+                {/* PROFILE */}
                 {user && (
                   <div className="relative" ref={dropdownRef}>
-
-                    {/* PROFILE BUTTON (same UI style) */}
                     <Button
                       variant="ghost"
                       size="md"
-                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      onClick={() => setIsProfileOpen((prev) => !prev)}
                       className="flex items-center gap-2"
                     >
                       <FaUserCircle className="text-blue-400" />
                       {user?.name || "User"}
                     </Button>
 
-                    {/* DROPDOWN */}
                     {isProfileOpen && (
                       <div className="absolute right-0 mt-2 w-40 bg-slate-900 border border-white/10 rounded-lg shadow-lg overflow-hidden z-50">
-
                         <button
                           onClick={handleLogout}
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-red-500/20 transition"
@@ -124,12 +130,10 @@ export default function HomePage() {
                           <FaSignOutAlt />
                           Logout
                         </button>
-
                       </div>
                     )}
                   </div>
                 )}
-
               </div>
             </header>
 
@@ -153,13 +157,13 @@ export default function HomePage() {
             </div>
 
             <footer className="mt-6 text-center text-xs text-slate-400">
-              Estate Scout UI demo. Connect your backend at `http://localhost:8000`.
+              Estate Scout UI demo.
             </footer>
           </div>
         </div>
 
         {/* 🔥 AUTH MODAL */}
-        <AuthModal isOpen={showModal} />
+        {hasCheckedAuth.current && <AuthModal isOpen={showModal} />}
 
       </div>
     </main>

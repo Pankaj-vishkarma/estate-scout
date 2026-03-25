@@ -5,31 +5,41 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-import time
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MAP_SIMULATOR_URL = os.getenv(
+    "MAP_SIMULATOR_URL", "http://localhost:3000/map-simulator"
+)
+FALLBACK_IMAGE = os.getenv("FALLBACK_IMAGE_PATH", "data/screenshots/fallback.png")
 
 
 def run_browser_action(action: str, value: str = "", filename: str = "output.png"):
     options = webdriver.ChromeOptions()
 
-    # 🔥 Headless mode
+    # 🔥 Production-safe Chrome options
     options.add_argument("--headless=new")
-    options.add_argument("--start-maximized")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
 
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=options
+        service=Service(ChromeDriverManager().install()),
+        options=options,
     )
 
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 15)
 
     try:
-        print(f"[Browser] Action: {action} | Value: {value}")
+        print(f"[Browser] Action: {action}")
 
-        driver.get("http://localhost:3000/map-simulator")
+        # ✅ Use ENV URL
+        driver.get(MAP_SIMULATOR_URL)
 
-        # 🔥 TYPE action
+        # 🔥 TYPE
         if action in ["type", "search_and_capture"]:
             search_box = wait.until(
                 EC.presence_of_element_located((By.ID, "search-box"))
@@ -37,33 +47,44 @@ def run_browser_action(action: str, value: str = "", filename: str = "output.png
             search_box.clear()
             search_box.send_keys(value)
 
-        # 🔥 CLICK action
+        # 🔥 CLICK
         if action in ["click", "search_and_capture"]:
             search_btn = wait.until(EC.element_to_be_clickable((By.ID, "search-btn")))
             search_btn.click()
 
-        # 🔥 SCREENSHOT action
+        # 🔥 WAIT FOR IMAGE LOAD (BETTER THAN sleep)
         if action in ["screenshot", "search_and_capture"]:
             image = wait.until(
                 EC.presence_of_element_located((By.ID, "street-view-image"))
             )
 
-            time.sleep(1)
+            # ✅ Wait until image loaded
+            wait.until(lambda d: image.get_attribute("data-loaded") == "true")
 
             os.makedirs("data/screenshots", exist_ok=True)
-            path = f"data/screenshots/{filename}"
+
+            # ✅ Safe filename handling
+            filename = os.path.basename(filename)
+            path = os.path.join("data", "screenshots", filename)
 
             image.screenshot(path)
 
             print(f"[Browser] Screenshot saved: {path}")
 
-            return path
+            return path.replace("\\", "/")
 
         return None
 
     except Exception as e:
         print(f"[Browser ERROR]: {e}")
-        return "data/screenshots/fallback.png"
+
+        # ✅ Ensure fallback exists
+        os.makedirs("data/screenshots", exist_ok=True)
+        if not os.path.exists(FALLBACK_IMAGE):
+            with open(FALLBACK_IMAGE, "wb") as f:
+                f.write(b"")
+
+        return FALLBACK_IMAGE
 
     finally:
         driver.quit()

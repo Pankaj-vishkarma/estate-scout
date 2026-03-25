@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation"; // ✅ NEW
-import { FaArrowLeft } from "react-icons/fa"; // ✅ NEW
+import { useRouter } from "next/navigation";
+import { FaArrowLeft } from "react-icons/fa";
 
 export default function MapSimulatorPage() {
-  const router = useRouter(); // ✅ NEW
+  const router = useRouter();
 
   const images = useMemo(
     () => [
@@ -28,17 +28,49 @@ export default function MapSimulatorPage() {
 
   const [query, setQuery] = useState("");
   const [selectedImg, setSelectedImg] = useState(images[0] || "");
+  const [loading, setLoading] = useState(false);
 
-  function viewStreetView() {
+  // ✅ Use existing ENV
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  async function viewStreetView() {
     console.log("Map search triggered for:", query);
 
+    setLoading(true);
     setSelectedImg("");
 
-    setTimeout(() => {
-      const randomIndex = Math.floor(Math.random() * images.length);
-      const next = images[randomIndex];
-      setSelectedImg(next);
-    }, 400);
+    try {
+      // ✅ Call backend endpoint (you can create this later)
+      if (API_BASE) {
+        const res = await fetch(`${API_BASE}/map-simulator?q=${query}`);
+
+        if (res.ok) {
+          const data = await res.json();
+
+          if (data?.image) {
+            setSelectedImg(data.image);
+          } else {
+            const index = query.length % images.length;
+            setSelectedImg(images[index]);
+          }
+        } else {
+          throw new Error("API failed");
+        }
+      } else {
+        throw new Error("No API base");
+      }
+    } catch (error) {
+      console.warn("Using fallback image:", error.message);
+
+      // ✅ deterministic fallback (NO RANDOM)
+      const index = query.length % images.length;
+
+      setTimeout(() => {
+        setSelectedImg(images[index]);
+      }, 500);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -88,7 +120,20 @@ export default function MapSimulatorPage() {
           </div>
 
           <div className="mt-6">
-            <div className="aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+            {/* ✅ IMPORTANT: Selenium container */}
+            <div
+              id="street-view"
+              data-testid="street-view"
+              className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-white/10 bg-white/5"
+            >
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <p className="animate-pulse text-sm text-white">
+                    Loading...
+                  </p>
+                </div>
+              )}
+
               <img
                 id="street-view-image"
                 data-loaded={selectedImg ? "true" : "false"}
@@ -96,7 +141,7 @@ export default function MapSimulatorPage() {
                 alt="Simulated street view"
                 className="h-full w-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = "/images/street-1.svg";
+                  e.currentTarget.src = "/images/apartment1.jpg";
                 }}
               />
             </div>

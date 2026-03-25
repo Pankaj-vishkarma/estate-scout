@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { sendMessage, getHistory } from "../lib/api";
 
 function safeId() {
@@ -16,12 +16,15 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const isRequesting = useRef(false); // ✅ prevent duplicate calls
+
   const api = useMemo(
     () => ({
       async sendUserMessage(text) {
         const trimmed = String(text || "").trim();
-        if (!trimmed) return;
+        if (!trimmed || isRequesting.current) return;
 
+        isRequesting.current = true;
         setError(null);
 
         const userMsg = {
@@ -31,15 +34,15 @@ export function useChat() {
           createdAt: Date.now(),
         };
 
-        setMessages((prev) => [...prev, userMsg]);
         setIsLoading(true);
 
         try {
           const res = await sendMessage(trimmed);
 
-          // 🔥 handle reply properly
           const reply =
-            typeof res === "string" ? res : res?.reply || "No response from server";
+            typeof res === "string"
+              ? res
+              : res?.reply || "No response from server";
 
           const assistantMsg = {
             id: safeId(),
@@ -48,20 +51,22 @@ export function useChat() {
             createdAt: Date.now(),
           };
 
-          setMessages((prev) => [...prev, assistantMsg]);
+          // ✅ SINGLE STATE UPDATE (performance)
+          setMessages((prev) => [...prev, userMsg, assistantMsg]);
 
-          // 🔥 SET ONLY CURRENT SEARCH PROPERTIES
-          if (res?.properties) {
-            setProperties(res.properties);
-          } else {
-            setProperties([]);
-          }
-
+          // ✅ safe property update
+          setProperties(
+            Array.isArray(res?.properties) ? res.properties : []
+          );
         } catch (e) {
           console.error("Chat Hook Error:", e);
           setError("Server not responding. Please try again.");
+
+          // ✅ still push user message (UX safe)
+          setMessages((prev) => [...prev, userMsg]);
         } finally {
           setIsLoading(false);
+          isRequesting.current = false;
         }
       },
     }),
@@ -70,20 +75,21 @@ export function useChat() {
 
   const clearError = useCallback(() => setError(null), []);
 
-  // 🔥 HISTORY FROM BACKEND
+  // 🔥 HISTORY
   const loadHistory = useCallback(async () => {
     try {
       setIsLoading(true);
 
       const data = await getHistory();
 
-      if (data?.messages) {
-        setMessages(data.messages);
-      }
+      // ✅ safe guards
+      setMessages(
+        Array.isArray(data?.messages) ? data.messages : []
+      );
 
-      if (data?.properties) {
-        setProperties(data.properties);
-      }
+      setProperties(
+        Array.isArray(data?.properties) ? data.properties : []
+      );
     } catch (err) {
       console.error("History Load Error:", err);
     } finally {
@@ -103,6 +109,7 @@ export function useChat() {
     ]);
 
     setProperties([]);
+    setError(null);
   }, []);
 
   return {

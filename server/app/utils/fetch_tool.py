@@ -3,19 +3,35 @@ from bs4 import BeautifulSoup
 import random
 
 
-# 🔥 FIX: add location parameter
 def fetch_property_details(url: str, location="Delhi"):
     try:
-        res = requests.get(url, timeout=5)
+        if not url:
+            return None
+
+        # ✅ safer request
+        res = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+
+        # ❌ skip bad responses
+        if res.status_code != 200:
+            print(f"[Fetch] Failed URL ({res.status_code}): {url}")
+            return None
+
         soup = BeautifulSoup(res.text, "html.parser")
 
-        # 🔥 Title extraction + fallback fix
-        title = soup.title.string if soup.title else "Apartment Listing"
+        # ✅ Safe title extraction
+        title = "Apartment Listing"
+        if soup.title and soup.title.string:
+            title = soup.title.string.strip()
 
-        if "Access" in title:
+        # fallback for blocked pages
+        if "Access" in title or not title:
             title = "Modern Apartment in Prime Location"
 
-        # 🔥 Dynamic location addresses
+        # ✅ deterministic seed (IMPORTANT for AI consistency)
+        seed = sum(ord(c) for c in url)
+        random.seed(seed)
+
+        # 🔥 Dynamic location-based addresses
         fake_addresses = [
             f"{location} Sector 1",
             f"{location} Sector 21",
@@ -26,7 +42,7 @@ def fetch_property_details(url: str, location="Delhi"):
 
         address = random.choice(fake_addresses)
 
-        # 🔥 FINAL FIX: use local property images (NO RANDOM API)
+        # 🔥 local images (deterministic)
         property_images = [
             "/images/apartment1.jpg",
             "/images/apartment2.jpg",
@@ -46,13 +62,17 @@ def fetch_property_details(url: str, location="Delhi"):
         image_url = random.choice(property_images)
 
         return {
-            "title": title[:50],
+            "title": title[:60],
             "price": f"₹{random.randint(10000, 30000)}",
             "address": f"{address} #{random.randint(1, 999)}",
             "image": image_url,
             "pet_friendly": True,
         }
 
+    except requests.exceptions.Timeout:
+        print(f"[Fetch] Timeout: {url}")
+        return None
+
     except Exception as e:
-        print(f"[Scout] Fetch failed: {e}")
+        print(f"[Fetch ERROR]: {e}")
         return None

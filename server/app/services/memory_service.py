@@ -1,4 +1,5 @@
 from app.config.db import users_collection
+from bson import ObjectId
 
 
 # ✅ SAVE USER PREFERENCES (USER-SPECIFIC)
@@ -9,7 +10,6 @@ def save_user_preference(message: str, user_id: str):
             return
 
         preferences = {}
-
         msg = message.lower()
 
         if "dog" in msg or "pet" in msg:
@@ -17,31 +17,32 @@ def save_user_preference(message: str, user_id: str):
 
         if preferences:
             users_collection.update_one(
-                {"user_id": user_id},  # ✅ USER-SPECIFIC
+                {"_id": ObjectId(user_id)},  # ✅ FIXED
                 {"$set": preferences},
-                upsert=True,
+                upsert=False,  # ❌ don't create new user
             )
 
     except Exception as e:
         print(f"[Memory SAVE ERROR]: {e}")
 
 
-# ✅ GET USER PREFERENCES (SAFE + USER-SPECIFIC)
-def get_user_preferences(user_id: str = None):  # 🔥 FIX: optional param
+# ✅ GET USER PREFERENCES (SAFE)
+def get_user_preferences(user_id: str = None):
     try:
-        print("🔥 get_user_preferences CALLED WITH:", user_id)
-
-        # 🔥 SAFETY: avoid crash if called बिना user_id
         if not user_id:
             print("⚠️ WARNING: user_id missing in get_user_preferences")
             return {}
 
-        user = users_collection.find_one({"user_id": user_id})
+        user = users_collection.find_one(
+            {"_id": ObjectId(user_id)},  # ✅ FIXED
+            {"password": 0},  # ✅ remove sensitive data
+        )
 
         if not user:
             return {}
 
-        return user
+        # ✅ Return only relevant preferences
+        return {"has_pet": user.get("has_pet", False)}
 
     except Exception as e:
         print(f"[Memory GET ERROR]: {e}")

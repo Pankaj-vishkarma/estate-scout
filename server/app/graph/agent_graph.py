@@ -11,43 +11,41 @@ from app.services.memory_service import (
 )
 
 
-# 🔥 STATE (UPDATED)
+# 🔥 STATE
 class AgentState(TypedDict):
     query: str
-    user_id: str  # ✅ NEW
+    user_id: str
     properties: List[Dict[str, Any]]
     user_preferences: Dict[str, Any]
 
 
-# 🔥 NODE 0: Memory Check (USER-SPECIFIC)
+# 🔥 NODE 0: Memory
 def memory_node(state: AgentState):
     print("[Graph] Memory Node")
 
-    user_id = state["user_id"]  # ✅ NEW
+    user_id = state["user_id"]
 
-    # ✅ Save preference (user-specific)
     save_user_preference(state["query"], user_id)
-
-    # ✅ Get preference (user-specific)
     preferences = get_user_preferences(user_id)
 
     return {"user_preferences": preferences}
 
 
-# 🔥 NODE 1: Scout (UNCHANGED)
+# 🔥 NODE 1: Scout (UPDATED)
 def scout_node(state: AgentState):
     print("[Graph] Scout Node")
 
-    properties = scout_properties(state["query"])
+    properties = scout_properties(state["query"], state.get("user_preferences", {}))
 
     return {"properties": properties}
 
 
-# 🔥 NODE 2: Inspector (UNCHANGED)
+# 🔥 NODE 2: Inspector (UPDATED SAFE)
 def inspector_node(state: AgentState):
     print("[Graph] Inspector Node")
 
     properties = state["properties"]
+    updated_properties = []
 
     for index, prop in enumerate(properties):
         result = inspect_property(prop["address"], index)
@@ -55,15 +53,14 @@ def inspector_node(state: AgentState):
         screenshot_path = result.get("street_view")
 
         if screenshot_path:
-            if screenshot_path.startswith("data/"):
-                prop["street_view"] = f"/{screenshot_path}"
-            else:
-                prop["street_view"] = screenshot_path
+            prop["street_view"] = f"/{screenshot_path}".replace("//", "/")
 
-    return {"properties": properties}
+        updated_properties.append(prop)
+
+    return {"properties": updated_properties}
 
 
-# 🔥 NODE 3: Broker (UNCHANGED)
+# 🔥 NODE 3: Broker
 def broker_node(state: AgentState):
     print("[Graph] Broker Node")
 
@@ -76,14 +73,15 @@ def broker_node(state: AgentState):
     return {"properties": properties}
 
 
-# 🔥 NODE 4: CRM (UNCHANGED)
+# 🔥 NODE 4: CRM (UPDATED)
 def crm_node(state: AgentState):
     print("[Graph] CRM Node")
 
     properties = state["properties"]
+    user_id = state["user_id"]
 
     for prop in properties:
-        save_property(prop)
+        save_property(prop, user_id)
 
     return {"properties": properties}
 
@@ -109,16 +107,18 @@ def build_graph():
     return builder.compile()
 
 
-# 🔥 RUN GRAPH (UPDATED)
+# 🔥 RUN GRAPH
 graph = build_graph()
 
 
-def run_agent_graph(query: str, user_id: str):  # ✅ UPDATED
+def run_agent_graph(query: str, user_id: str):
     result = graph.invoke(
         {
             "query": query,
-            "user_id": user_id,  # ✅ IMPORTANT
+            "user_id": user_id,
         }
     )
+
+    print("[Graph] Final Output:", result.get("properties"))
 
     return result.get("properties", [])

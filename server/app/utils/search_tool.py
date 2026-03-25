@@ -1,52 +1,74 @@
 import requests
 import os
 from dotenv import load_dotenv
+import time
 
-# Load env variables
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
-print("[DEBUG] Tavily API Key Loaded:", "YES" if TAVILY_API_KEY else "NO")
+# ❗ Validate API key early
+if not TAVILY_API_KEY:
+    print("[Scout] ❌ Tavily API key missing")
 
 
 def search_properties(query: str):
     url = "https://api.tavily.com/search"
 
-    print(f"[Scout] 🔍 Search Query: {query}")
-
-    if not TAVILY_API_KEY:
-        print("[Scout] ❌ ERROR: Tavily API key missing in .env")
+    if not query or not query.strip():
         return []
 
-    payload = {"query": query, "search_depth": "basic", "max_results": 3}
+    if not TAVILY_API_KEY:
+        return []
+
+    payload = {
+        "query": query.strip(),
+        "search_depth": "basic",
+        "max_results": 3,
+    }
 
     headers = {"Authorization": f"Bearer {TAVILY_API_KEY}"}
 
-    try:
-        print("[Scout] 🚀 Sending request to Tavily API...")
+    retries = 2  # ✅ retry mechanism
 
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
+    for attempt in range(retries + 1):
+        try:
+            response = requests.post(
+                url, json=payload, headers=headers, timeout=10  # ✅ safer timeout
+            )
 
-        print(f"[Scout] 📡 Status Code: {response.status_code}")
+            if response.status_code != 200:
+                print(f"[Scout] API failed (attempt {attempt+1})")
+                time.sleep(1)
+                continue
 
-        # 🔥 Print raw response (IMPORTANT)
-        print("[Scout] 📦 Raw Response:", response.text[:500])
+            data = response.json()
 
-        if response.status_code != 200:
-            print(f"[Scout] ❌ Search API failed: {response.text}")
-            return []
+            results = data.get("results", [])
 
-        results = response.json().get("results", [])
+            if not isinstance(results, list):
+                return []
 
-        print(f"[Scout] ✅ Results Found: {len(results)}")
+            # ✅ Clean result format
+            cleaned_results = [
+                {
+                    "url": r.get("url"),
+                    "title": r.get("title"),
+                    "content": r.get("content"),
+                }
+                for r in results
+                if r.get("url")
+            ]
 
-        # 🔥 Print URLs
-        for i, r in enumerate(results):
-            print(f"[Scout] Result {i+1}: {r.get('url')}")
+            return cleaned_results
 
-        return results
+        except requests.exceptions.Timeout:
+            print(f"[Scout] Timeout (attempt {attempt+1})")
+            time.sleep(1)
 
-    except Exception as e:
-        print(f"[Scout] ❌ Search error: {e}")
-        return []
+        except Exception as e:
+            print(f"[Scout] Error: {e}")
+            break
+
+    # ❌ fallback
+    return []

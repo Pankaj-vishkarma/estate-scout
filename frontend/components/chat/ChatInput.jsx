@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Button from "../ui/Button";
 
 export default function ChatInput({ onSend, isLoading = false }) {
   const [value, setValue] = useState("");
+  const textareaRef = useRef(null);
 
   const canSend = useMemo(() => {
     return (
@@ -13,6 +14,18 @@ export default function ChatInput({ onSend, isLoading = false }) {
       String(value || "").trim().length > 0
     );
   }, [isLoading, value, onSend]);
+
+  // ✅ Auto resize textarea (smooth typing)
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setValue(val);
+
+    const el = textareaRef.current;
+    if (!el) return;
+
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px"; // max height
+  };
 
   function submit() {
     if (!canSend) return;
@@ -23,6 +36,11 @@ export default function ChatInput({ onSend, isLoading = false }) {
     try {
       onSend(trimmed);
       setValue("");
+
+      // ✅ reset height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
     } catch (err) {
       console.error("Send message error:", err);
     }
@@ -37,9 +55,10 @@ export default function ChatInput({ onSend, isLoading = false }) {
           </label>
 
           <textarea
+            ref={textareaRef}
             id="chat-input"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={handleChange}
             placeholder="Ask about a neighborhood, price range, or a property..."
             className="w-full resize-none bg-transparent text-sm leading-relaxed placeholder:text-slate-400 text-slate-100 outline-none"
             rows={1}

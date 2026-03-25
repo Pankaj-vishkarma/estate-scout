@@ -12,32 +12,44 @@ export default function ChatWindow({
   error = null,
   onSend,
   onClearError,
-
-  // 🔥 NEW PROPS
   onNewSearch,
   onLoadHistory,
 }) {
   const endRef = useRef(null);
+  const containerRef = useRef(null);
 
   const [mounted, setMounted] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true); // ✅ control scroll
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // ✅ Smooth auto scroll
+  // ✅ Detect user scroll
   useEffect(() => {
-    if (!mounted) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const el = endRef.current;
-    if (!el) return;
+    const handleScroll = () => {
+      const isAtBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 50;
 
-    const timer = setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "end" });
-    }, 100);
+      setAutoScroll(isAtBottom);
+    };
 
-    return () => clearTimeout(timer);
-  }, [messages, isLoading, mounted]);
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // ✅ Smooth auto-scroll (no timeout)
+  useEffect(() => {
+    if (!mounted || !autoScroll) return;
+
+    endRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages, isLoading, autoScroll, mounted]);
 
   const tips = useMemo(
     () => [
@@ -66,29 +78,24 @@ export default function ChatWindow({
           </div>
         </div>
 
-        {/* 🔥 NEW: ACTION BUTTONS (NO UI BREAK) */}
         <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onNewSearch}
-          >
+          <Button variant="ghost" size="sm" onClick={onNewSearch}>
             New Search
           </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLoadHistory}
-          >
+          <Button variant="ghost" size="sm" onClick={onLoadHistory}>
             History
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col h-[560px]">
-        <div className="flex-1 overflow-auto p-4 space-y-3">
-          {/* ✅ Empty State */}
+        {/* ✅ SCROLL CONTAINER */}
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-auto p-4 space-y-3"
+        >
+          {/* Empty */}
           {messages.length === 0 && !isLoading && (
             <div className="pt-6 text-center">
               <div className="text-sm font-semibold text-slate-200">
@@ -107,7 +114,7 @@ export default function ChatWindow({
             </div>
           )}
 
-          {/* ✅ Messages */}
+          {/* Messages */}
           <AnimatePresence initial={false}>
             {messages.map((m, index) => {
               if (!m || typeof m.content !== "string") return null;
@@ -120,13 +127,12 @@ export default function ChatWindow({
             })}
           </AnimatePresence>
 
-          {/* ✅ Loading */}
+          {/* Loading */}
           {isLoading && (
             <motion.div
               className="w-full flex justify-start"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
             >
               <div className="max-w-[92%] rounded-2xl px-4 py-3 glass border border-white/10">
                 <div className="mb-1 text-xs font-semibold text-slate-300">
@@ -137,17 +143,13 @@ export default function ChatWindow({
             </motion.div>
           )}
 
-          {/* ✅ Error */}
+          {/* Error */}
           {error && (
             <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 p-4">
               <div className="text-sm font-semibold text-red-100">Error</div>
               <div className="mt-1 text-sm text-red-100/90">{error}</div>
               <div className="mt-3 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClearError}
-                >
+                <Button variant="ghost" size="sm" onClick={onClearError}>
                   Dismiss
                 </Button>
               </div>
@@ -157,7 +159,7 @@ export default function ChatWindow({
           <div ref={endRef} />
         </div>
 
-        {/* ✅ Input */}
+        {/* Input */}
         <div className="p-4 border-t border-white/10">
           <ChatInput
             onSend={(text) => {

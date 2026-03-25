@@ -4,8 +4,12 @@ function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
 }
 
-// 🔐 NEW: Auth Headers
+// ✅ SAFE LOCALSTORAGE (SSR SAFE)
 function getAuthHeaders() {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+
   const token = localStorage.getItem("token");
 
   return {
@@ -14,7 +18,23 @@ function getAuthHeaders() {
   };
 }
 
-// Safe JSON reader
+// ✅ FETCH WITH TIMEOUT
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+// ✅ SAFE JSON PARSER
 async function readJsonSafe(res) {
   const contentType = res.headers.get("content-type") || "";
 
@@ -35,25 +55,42 @@ export async function sendMessage(message) {
   try {
     const baseUrl = getApiBaseUrl();
 
-    const res = await fetch(`${baseUrl}/chat`, {
-      method: "POST",
-      headers: getAuthHeaders(), // ✅ UPDATED
-      body: JSON.stringify({ message }),
-      cache: "no-store",
-    });
+    // 🔥 IMPORTANT: long timeout for AI
+    const res = await fetchWithTimeout(
+      `${baseUrl}/chat`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ message }),
+        cache: "no-store",
+      },
+      60000 // ✅ 60 seconds
+    );
 
     if (!res.ok) {
       const payload = await readJsonSafe(res);
-      console.error("Chat API Error:", payload);
-      return "Server error. Please try again.";
+      return {
+        reply: payload?.detail || "Server error. Please try again.",
+        properties: [],
+      };
     }
 
     const payload = await res.json();
 
-    return payload || "No response from server";
+    return {
+      reply: payload?.reply || "No response",
+      properties: Array.isArray(payload?.properties)
+        ? payload.properties
+        : [],
+    };
+
   } catch (error) {
-    console.error("Chat Fetch Error:", error);
-    return "Unable to connect to server.";
+    console.error("Chat Timeout/Error:", error);
+
+    return {
+      reply: "AI is taking longer than expected. Please wait or try again.",
+      properties: [],
+    };
   }
 }
 
@@ -62,45 +99,38 @@ export async function getProperties() {
   try {
     const baseUrl = getApiBaseUrl();
 
-    const res = await fetch(`${baseUrl}/properties`, {
+    const res = await fetchWithTimeout(`${baseUrl}/properties`, {
       method: "GET",
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
-    if (!res.ok) {
-      const payload = await readJsonSafe(res);
-      console.error("Property API Error:", payload);
-      return [];
-    }
+    if (!res.ok) return [];
 
     const payload = await res.json();
 
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.properties)) return payload.properties;
-
-    return [];
-  } catch (error) {
-    console.error("Property Fetch Error:", error);
+    return Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.properties)
+        ? payload.properties
+        : [];
+  } catch {
     return [];
   }
 }
 
-// 🔥 HISTORY API (UPDATED WITH AUTH)
+// 🔥 HISTORY API
 export async function getHistory() {
   try {
     const baseUrl = getApiBaseUrl();
 
-    const res = await fetch(`${baseUrl}/history`, {
+    const res = await fetchWithTimeout(`${baseUrl}/history`, {
       method: "GET",
-      headers: getAuthHeaders(), // ✅ UPDATED
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
-    if (!res.ok) {
-      const payload = await readJsonSafe(res);
-      console.error("History API Error:", payload);
-      return { messages: [], properties: [] };
-    }
+    if (!res.ok) return { messages: [], properties: [] };
 
     const payload = await res.json();
 
@@ -108,20 +138,17 @@ export async function getHistory() {
       messages: Array.isArray(payload?.messages) ? payload.messages : [],
       properties: Array.isArray(payload?.properties) ? payload.properties : [],
     };
-  } catch (error) {
-    console.error("History Fetch Error:", error);
+  } catch {
     return { messages: [], properties: [] };
   }
 }
 
-// 🔐 LOGIN API (FIXED)
+// 🔐 LOGIN API
 export async function loginUser(data) {
   try {
-    console.log("API CALL START");
-
     const baseUrl = getApiBaseUrl();
 
-    const res = await fetch(`${baseUrl}/auth/login`, {
+    const res = await fetchWithTimeout(`${baseUrl}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -129,15 +156,10 @@ export async function loginUser(data) {
       body: JSON.stringify(data),
     });
 
-    console.log("API STATUS:", res.status);
-
-    const payload = await res.json();
-
-    console.log("API RESPONSE:", payload);
+    const payload = await readJsonSafe(res);
 
     return payload;
-  } catch (error) {
-    console.error("Login Error:", error);
+  } catch {
     return null;
   }
 }
@@ -145,11 +167,9 @@ export async function loginUser(data) {
 // 🔐 REGISTER API
 export async function registerUser(data) {
   try {
-    console.log("🚀 REGISTER API START");
+    const baseUrl = getApiBaseUrl(); // ✅ FIXED
 
-    const baseUrl = "http://localhost:8000";
-
-    const res = await fetch(`${baseUrl}/auth/register`, {
+    const res = await fetchWithTimeout(`${baseUrl}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -157,21 +177,18 @@ export async function registerUser(data) {
       body: JSON.stringify(data),
     });
 
-    console.log("✅ RESPONSE STATUS:", res.status);
-
-    const payload = await res.json();
-
-    console.log("📦 RESPONSE DATA:", payload);
+    const payload = await readJsonSafe(res);
 
     return payload;
-  } catch (error) {
-    console.error("❌ REGISTER ERROR:", error);
+  } catch {
     return null;
   }
 }
 
-// 🔐 LOGOUT (BONUS - SAFE)
+// 🔐 LOGOUT
 export function logoutUser() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  }
 }

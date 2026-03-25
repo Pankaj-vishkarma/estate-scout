@@ -1,21 +1,23 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useMemo } from "react";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const DEFAULT_FALLBACK = "/images/apartment1.jpg";
+
+function getBaseUrl() {
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+}
 
 function resolveImage(img) {
   if (!img || typeof img !== "string") return null;
 
-  // 🔥 FIX: local frontend images
-  if (img.startsWith("/images")) {
-    return img; // ✅ frontend serve karega
-  }
+  // ✅ frontend images
+  if (img.startsWith("/images")) return img;
 
-  // 🔥 backend files (screenshots)
+  // ✅ backend images
   if (img.startsWith("/data")) {
-    return `${BASE_URL}${img}`;
+    return `${getBaseUrl()}${img}`;
   }
 
   return img;
@@ -26,7 +28,7 @@ function getPropTitle(p) {
 }
 
 function formatPrice(price) {
-  if (price === null || price === undefined || price === "") return "—";
+  if (!price) return "—";
 
   const cleaned = String(price).replace(/[^\d.]/g, "");
   const n = Number(cleaned);
@@ -49,22 +51,25 @@ function getPropAddress(p) {
 export default function PropertyCard({ property }) {
   if (!property || typeof property !== "object") return null;
 
-  const title = getPropTitle(property);
-  const price = formatPrice(property?.price);
-  const address = getPropAddress(property);
+  // ✅ memo for performance
+  const { title, price, address, finalImage } = useMemo(() => {
+    const title = getPropTitle(property);
+    const price = formatPrice(property?.price);
+    const address = getPropAddress(property);
 
-  // 🔥 IMAGE RESOLVE
-  const primaryImage = resolveImage(property?.image); // local image
-  const streetImage = resolveImage(property?.street_view); // screenshot
+    const primaryImage = resolveImage(property?.image);
+    const streetImage = resolveImage(property?.street_view);
 
-  // 🔥 FINAL STRICT PRIORITY FIX
-  let finalImage = "/images/street-1.svg";
+    let finalImage = DEFAULT_FALLBACK;
 
-  if (primaryImage && primaryImage.includes("/images")) {
-    finalImage = primaryImage; // ✅ ALWAYS local image first
-  } else if (streetImage) {
-    finalImage = streetImage; // fallback
-  }
+    if (primaryImage && primaryImage.includes("/images")) {
+      finalImage = primaryImage;
+    } else if (streetImage) {
+      finalImage = streetImage;
+    }
+
+    return { title, price, address, finalImage };
+  }, [property]);
 
   return (
     <motion.div
@@ -79,8 +84,9 @@ export default function PropertyCard({ property }) {
             alt={title}
             className="h-full w-full object-cover"
             loading="lazy"
+            decoding="async" // ✅ performance boost
             onError={(e) => {
-              e.currentTarget.src = "/images/street-1.svg";
+              e.currentTarget.src = DEFAULT_FALLBACK;
             }}
           />
         </div>
